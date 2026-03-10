@@ -1,0 +1,49 @@
+name: HyperOS Port
+
+on:
+  workflow_dispatch:
+    inputs:
+      stock_url:
+        description: 'URL стоковой прошивки (zip)'
+        required: true
+      donor_url:
+        description: 'URL донорской прошивки (zip)'
+        required: true
+      density:
+        description: 'persist.miui.density_v2 / ro.sf.lcd_density value'
+        required: true
+
+jobs:
+  port:
+    runs-on: ubuntu-latest
+    env:
+      WORKDIR: ${{ github.workspace }}/work
+      DENSITY: ${{ github.event.inputs.density }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Prepare environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip unzip p7zip-full simg2img e2fsprogs bsdtar
+          chmod +x scripts/*.sh
+          ./scripts/install_tools.sh
+
+      - name: Download and unpack firmwares
+        run: |
+          mkdir -p $WORKDIR
+          ./scripts/download_and_unpack.sh "${{ github.event.inputs.stock_url }}" "${{ github.event.inputs.donor_url }}" $WORKDIR
+
+      - name: Run porting logic
+        run: |
+          ./scripts/port.sh $WORKDIR "$DENSITY"
+
+      - name: Repack images
+        run: |
+          ./scripts/repack.sh $WORKDIR
+
+      - name: Cleanup runner disk
+        run: |
+          ./scripts/cleanup.sh $WORKDIR
+          
